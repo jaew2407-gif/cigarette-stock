@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>담배 자동 재고조사</title>
+<style>
+:root{--bg:#f3f4f6;--card:#fff;--line:#d1d5db;--text:#111827;--muted:#6b7280;--blue:#2563eb;--green:#059669;--red:#dc2626;--amber:#d97706;}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;color:var(--text);padding-bottom:calc(20px + env(safe-area-inset-bottom));}
+.app{max-width:720px;margin:auto;padding:12px;}
+.header{position:sticky;top:0;z-index:20;background:rgba(243,244,246,.96);backdrop-filter:blur(8px);padding:calc(8px + env(safe-area-inset-top)) 0 10px;}
+h1{font-size:22px;margin:0 0 4px} .sub{font-size:12px;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+.camera-wrap{position:relative;background:#111;border-radius:14px;overflow:hidden;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center}
+video{width:100%;height:100%;object-fit:cover;background:#111}
+.scan-guide{position:absolute;left:8%;right:8%;top:35%;height:30%;border:3px solid #22c55e;border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.28);pointer-events:none}
+.scan-line{position:absolute;left:11%;right:11%;top:50%;height:2px;background:#ef4444;box-shadow:0 0 8px #ef4444;pointer-events:none}
+.cam-message{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;text-align:center;padding:28px;font-weight:700;background:#111}
+.controls{display:grid;grid-template-columns:1.5fr 1fr;gap:8px;margin-top:10px}
+button,.fakebtn{border:0;border-radius:12px;padding:12px 10px;font-weight:800;font-size:15px;cursor:pointer;text-align:center}
+.primary{background:var(--blue);color:white} .secondary{background:#e5e7eb;color:#111827} .warn{background:#fef3c7;color:#92400e} .danger{background:#fee2e2;color:#991b1b} .green{background:#dcfce7;color:#166534}
+button:disabled{opacity:.5;cursor:not-allowed}
+.row{display:flex;gap:8px;align-items:end} .grow{flex:1} label{display:block;font-size:12px;color:var(--muted);font-weight:800;margin-bottom:5px}
+input{width:100%;border:1px solid #cbd5e1;border-radius:12px;padding:13px;font-size:18px;background:#fff} input:focus{outline:3px solid rgba(37,99,235,.18);border-color:#2563eb}
+.manual{display:grid;grid-template-columns:1fr auto;gap:8px}
+.status{font-size:13px;padding:9px 10px;border-radius:10px;background:#eef2ff;color:#3730a3;margin-top:9px;line-height:1.35}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px} .stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px;text-align:center} .stat span{font-size:11px;color:var(--muted);display:block} .stat b{font-size:20px}
+.item-head{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:6px} .item-head h2{font-size:17px;margin:0} .badge{font-size:11px;padding:4px 7px;border-radius:999px;background:#eef2ff;color:#3730a3}
+.rec{border-top:1px solid #e5e7eb;padding:11px 0;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center} .rec:first-of-type{border-top:0} .rec-name{font-weight:800;font-size:14px} .rec-bc{font-size:11px;color:var(--muted);word-break:break-all} .recnums{font-size:12px;margin-top:4px} .diff-neg{color:var(--red);font-weight:900} .diff-pos{color:var(--blue);font-weight:900} .diff-zero{color:var(--green);font-weight:900}
+.smallbtn{padding:7px 9px;font-size:12px;border-radius:9px;background:#f3f4f6}
+.bottom-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.empty{text-align:center;color:var(--muted);font-size:13px;padding:18px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;display:none;align-items:flex-end;justify-content:center} .modal.show{display:flex} .sheet{width:min(720px,100%);background:#fff;border-radius:22px 22px 0 0;padding:18px 14px calc(18px + env(safe-area-inset-bottom));max-height:90vh;overflow:auto}
+.sheet h2{font-size:20px;margin:0 0 4px} .product{font-size:16px;font-weight:900;margin:8px 0 2px} .barcode{font-size:12px;color:var(--muted);margin-bottom:12px} .two{display:grid;grid-template-columns:1fr 1fr;gap:10px} .diffbox{margin-top:12px;padding:13px;border-radius:12px;background:#f9fafb;text-align:center} .diffbox b{font-size:26px}
+.sheet-actions{display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-top:12px}
+.notice{font-size:12px;color:var(--muted);line-height:1.5}
+.hidden-file{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+@media(max-width:380px){.controls{grid-template-columns:1fr 1fr} .stats{grid-template-columns:1fr 1fr 1fr} .two{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header"><h1>담배 모바일 재고조사</h1><div class="sub">A13 자동스캔 · 바코드 인식 → 서버재고 / 실재고 → 저장 → 다음 상품</div></div>
+
+  <div class="card">
+    <div class="camera-wrap">
+      <video id="video" playsinline muted></video>
+      <div class="scan-guide"></div><div class="scan-line"></div>
+      <div id="camMessage" class="cam-message">자동 스캔 시작을 눌러주세요</div>
+    </div>
+    <div class="controls">
+      <button id="startBtn" class="primary" onclick="startCamera()">자동 스캔 시작</button>
+      <button id="torchBtn" class="warn" onclick="toggleTorch()" disabled>손전등</button>
+</div>
+<div id="liveFallback" style="display:none"></div>
+<div id="status" class="status">대기 중 · 230개 상품 DB 내장</div>
+  </div>
+
+  <div class="card">
+    <label>바코드 수동 입력</label>
+    <div class="manual"><input id="manualBarcode" inputmode="numeric" autocomplete="off" placeholder="바코드 숫자"><button class="secondary" onclick="submitManual()">조회</button></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><span>조사 품목</span><b id="statCount">0</b></div>
+    <div class="stat"><span>부족 수량</span><b id="statNeg">0</b></div>
+    <div class="stat"><span>과다 수량</span><b id="statPos">0</b></div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <div class="item-head"><h2>조사한 상품</h2><span id="dateBadge" class="badge"></span></div>
+    <div id="records"></div>
+  </div>
+
+  <div class="card bottom-actions">
+    <button class="green" onclick="exportCSV()">CSV 저장</button>
+    <button class="danger" onclick="clearAll()">오늘 기록 초기화</button>
+  </div>
+  <div class="notice">※ 처음 한 번 <b>자동 스캔 시작</b>을 누르고 카메라 권한을 허용하면, 카메라는 계속 켜진 상태로 다음 바코드를 자동 인식합니다. 로컬 파일(content://)이 아니라 <b>localhost 또는 HTTPS</b> 주소에서 열어야 카메라 권한이 정상 작동합니다. 기록은 이 휴대폰 Chrome에 자동 저장됩니다.</div>
+</div>
+
+<div id="modal" class="modal" onclick="if(event.target===this)closeSheet()">
+  <div class="sheet">
+    <h2>재고 입력</h2>
+    <div id="sheetProduct" class="product"></div>
+    <div id="sheetBarcode" class="barcode"></div>
+    <div id="unknownWrap" style="display:none;margin-bottom:10px"><label>미등록 상품명</label><input id="unknownName" placeholder="상품명 직접 입력"></div>
+    <div class="two">
+      <div><label>서버재고</label><input id="serverStock" type="number" inputmode="numeric" min="0" step="1" placeholder="0"></div>
+      <div><label>실제재고</label><input id="actualStock" type="number" inputmode="numeric" min="0" step="1" placeholder="0"></div>
+    </div>
+    <div class="diffbox">차이 (실제 - 서버)<br><b id="diffValue">0</b></div>
+    <div class="sheet-actions"><button class="secondary" onclick="closeSheet()">취소</button><button class="primary" onclick="saveRecord()">저장하고 다음 스캔</button></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+const PRODUCTS={"8801116005314":"01K)에쎄체인지1mg","8801116005574":"02K)에쎄체인지4mg","8801116015887":"03K)에쎄체인지프로즌","8801116021888":"04K)에쎄체인지그램","8801116007257":"05K)에쎄체인지업1mg","8801116008490":"06K)에쎄체인지린1mg","8801116010011":"07K)에쎄체인지빙1mg","8801116040360":"08K)에쎄체인지슈팅레드1mg","88011967":"09K)에쎄프라임","8801116001712":"10K)에쎄수0.1","8801116000937":"11K)에쎄수","8801116013319":"12K)에쎄히말라야1mg","8801116042418":"13K)에쎄히말라야윈터1mg","88012087":"14K)에쎄원1mg","8801116025251":"15K)에쎄이츠딥브라운1mg","8801116002108":"26K)에쎄스페셜골드1mg","8801116000593":"27K)에쎄스페셜골드3.5mg","8801116005598":"28K)에쎄골든리프1mg","8801116006915":"29K)에쎄스페셜골드0.5mg","8801116037377":"K)에쎄골든리프0.5mg","8801116001392":"K)에쎄골든리프3mg","8801116051106":"K)에쎄느와르1mg","8801116007431":"K)에쎄로열팰리스1mg","8801116001194":"K)에쎄수0.5","8801116003556":"K)에쎄아이스1mg","8801116002009":"K)에쎄엣지1mg","8801116006007":"K)에쎄체인지W","8801116054862":"K)에쎄체인지썬1mg","8801116004829":"K)에쎄프레쏘1mg","8801116056934":"K)에쎄히말라야샤인1mg","8801116000913":"16K)레종블랙1mg","88011189":"17K)레종블루","8801116046522":"18K)레종이오니아미스틱퍼플0.1mg","8801116006830":"19K)레종프렌치블랙3mg","8801116007172":"20K)레종프렌치요고1mg","8801116046560":"K)레종이오니아썸머레드0.1mg","8801116036028":"K)레종이오니아아일랜드핑크0.1mg","8801116036066":"K)레종이오니아아쿠아그린0.1mg","8801116024162":"K)레종프렌치썸3mg","8801116019397":"K)레종프렌치아이스블랑","8801116006533":"23K)보헴시가슬림핏브라운1mg","8801116001279":"K)보헴시가넘버1","8801116002986":"K)보헴시가넘버3","8801116001293":"K)보헴시가넘버6","8801116007417":"K)보헴시가리브레5mg","8801116002702":"K)보헴시가마스터","8801116046225":"K)보헴시가시그니처","8801116061280":"K)보헴시가시그니처슈퍼슬림1mg","8801116022731":"K)보헴시가아이스핏","8801116018482":"K)보헴시가카리브","8801116003907":"K)보헴쿠바나더블","8801116071739":"K)보헴쿠바나맥스","8801116003921":"K)보헴쿠바나샷1mg","8801116010288":"K)보헴파이프스코티3mg","8801116004652":"K)시가미니1mg","8801116004676":"K)시가미니5mg","8801116054107":"K)호그스헤드10mg","8801116059423":"K)호그스헤드6mg","8801116006076":"K)더원체인지","8801116001613":"K)더원화이트0.1m","8801116000456":"21K)더원블루1m","8801116001033":"22K)더원오렌지0.5m","88003429":"K)심플클래식","88003542":"K)한라산","88011158":"25K)시즌","8801116001095":"30K)클라우드9_1mg","88011981":"K)클라우드9_5mg","88012063":"K)타임미드","8801116062782":"K)디스(신)","8801116005451":"K)디스아프리카룰라","8801116006403":"K)디스아프리카몰라","8801116008551":"K)디스아프리카아이스잭5mg","8801116052011":"K)디스플러스(신)","8801116062829":"K)라일락(신)","8801116006731":"K)토니노람보르기니아이스볼트GT","8801116013234":"31K)MIIX아이스더블","8801116012435":"32K)MIIX믹스","8801116015931":"33K)MIIX아이스뱅","8801116016419":"34K)MIIX콤보","8801116056644":"35K)MIIX아이스모아","8801116037292":"36K)MIIX블루썸","8801116042890":"37K)MIIX오라썸","8801116060573":"38K)MIIX레드썸","8801116060535":"39K)MIIX퍼플썸","8801116012596":"40K)MIIX프렌치","8801116012480":"41K)MIIX아이스","8801116041299":"42K)MIIX업투","8801116050888":"K)MIIX보나썸","8801116067596":"K)MIIX시가컬렉션","8801116029914":"K)MIIX아이션","8801116014217":"K)MIIX클래시","8801116012176":"K)릴하이브리드(액상카트리지)","8801116025695":"43K)에임트와이스(에이블)","8801116044467":"44K)에임블루밍(에이블)","8801116044443":"45K)에임아이스노우(에이블)","8801116034543":"46K)에임아이스러시(에이블)","8801116044481":"47K)에임커플(에이블)","8801116047048":"48K)에임아이스피크(에이블)","8801116031221":"49K)에임카메오(에이블)","8801116047000":"50K)에임시가리쉬(에이블)","8801116061181":"K)에임리모(에이블)","8801116068913":"K)에임리믹스(에이블)","8801116068937":"K)에임아이스팟(에이블)","8801116068128":"K)에임체인지업(에이블)","8801116068142":"K)에임쿨샷(에이블)","8801116048311":"K)에임탱고(에이블)","8801116055050":"K)에임헤이즈(에이블)","8801116059003":"K)레임벨벳(에이블)","8801116058303":"K)레임아이스(에이블)","8801116058327":"K)레임아이스미드(에이블)","8801116009435":"K)Fiit체인지","8801116009572":"K)Fiit체인지업","8801116011599":"K)Fiit쿨샷","88022536":"J)메비우스LBS2.0선셋비치3mg","88025414":"J)메비우스LBS나이스티3mg(신)","88022147":"J)메비우스LBS믹스그린1mg","88021140":"J)메비우스LBS스파클링듀3mg","88024295":"J)메비우스LBS시트로웨이브3mg","88024585":"J)메비우스LBS아이스바나2mg(신)","88021386":"J)메비우스LBS아이스스톰5mg(New)","88025278":"J)메비우스LBS아이스프로스트1mg","88024516":"J)메비우스LBS아이스피즈수퍼슬림3mg(신)","88021331":"J)메비우스LBS옐로우1mg","88022116":"J)메비우스LBS옐로우3mg","88022123":"J)메비우스LBS옐로우슈퍼슬림1mg","88022598":"J)메비우스LBS트로피컬믹스3mg","88019154":"J)메비우스LBS퍼플6mg","88020792":"J)메비우스LSS1mg(New)","88020785":"J)메비우스LSS윈드블루3mg(New)","88020747":"J)메비우스스카이블루","88023243":"J)메비우스스카이블루롱스","88020730":"J)메비우스스카이블루소프트팩","88025483":"J)메비우스아이스트위스트1mg","88025490":"J)메비우스아이스트위스트4mg","88020761":"J)메비우스오리지날","88020754":"J)메비우스윈드블루3mg","88025247":"J)메비우스이스타일3(신)","88025254":"J)메비우스이스타일6(신)","88024929":"J)카멜블루5mg(신)","88024912":"J)카멜필터커브8m(신)","88011745":"P)말보로골드오리지널","88024639":"P)말보로딥블렌드11","88024646":"P)말보로딥블렌드23","88011707":"P)말보로레드","88011721":"P)말보로미디엄","88014494":"P)말보로블랙후레쉬","88024608":"P)말보로비스타가든스플래시1mg","88023489":"P)말보로비스타블러썸미스트1mg","88023441":"P)말보로비스타슈퍼슬림포레스트","88023465":"P)말보로비스타썸머스플래시3mg","88023434":"P)말보로비스타트로피컬브리즈","88023403":"P)말보로비스타트로피컬스플래시","88012407":"P)말보로실버","88017174":"P)말보로아이스블라스트","88017617":"P)말보로아이스블라스트1mg","88017648":"P)말보로하이브리드1m","88017655":"P)말보로하이브리드5m","88024615":"P)말보로화이트1mg","88011752":"P)말보로화이트후레쉬","88013169":"P)버지니아슬림1mg","88011851":"P)버지니아슬림골드","88011882":"P)버지니아슬림블루","88019918":"P)팔리아멘트수퍼슬림레드","88019932":"P)팔리아멘트수퍼슬림원","88019949":"P)팔리아멘트수퍼슬림클리어피니쉬1mg","88013114":"P)팔리아멘트아쿠아1mg","88014463":"P)팔리아멘트아쿠아3mg","88013121":"P)팔리아멘트아쿠아5mg","88017693":"P)팔리아멘트하이브리드","88017624":"P)팔리아멘트하이브리드5mg","88011844":"P)하모니(라크)1mg","88024837":"P)센티아제스티레드","88024714":"P)센티아클래식골드","88024790":"P)센티아클래식다크그린","88024721":"P)센티아클래식실버","88024738":"P)센티아클래식퍼플","88023021":"P)테리아그린","88023038":"P)테리아그린징","88024165":"P)테리아러셋","88024813":"P)테리아리모나펄","88024769":"P)테리아리비에라펄","88023502":"P)테리아블랙그린","88024189":"P)테리아블랙루비","88023526":"P)테리아블랙퍼플","88023014":"P)테리아블루","88024806":"P)테리아샤인펄","88024196":"P)테리아스탈링펄","88023052":"P)테리아실버","88024141":"P)테리아썬펄","88023564":"P)테리아썸머웨이브","88023045":"P)테리아앰버","88024134":"P)테리아오아시스펄","88023090":"P)테리아유젠","88024752":"P)테리아트와일라잇펄","88024158":"P)테리아티크","88021492":"P)테리아퍼플웨이브","88022680":"B)던힐1mg(신)_DTOLL","88022673":"B)던힐3mg(신)_DTOLL","88022666":"B)던힐6mg(신)_DTOLL","88022949":"B)던힐스위치6mg(신)","88022963":"B)던힐스위치ONE(신)","88015712":"B)던힐파인컷0.1mg","88014128":"B)던힐파인컷1mg","88023977":"B)던힐파인컷멜로우크러쉬(New)","88014142":"B)던힐파인컷수프림(4mg)","88020396":"B)던힐파인컷스위치(New)","88016436":"B)던힐파인컷프로스트1mg","88022697":"B)던힐프로스트(신)_DTOLL","8888075107495":"B)뉴욕에디션_던힐3mg","8888075082266":"B)런던에디션_던힐1.5mg","8888075107464":"B)파리에디션_던힐3mg","88019482":"B)켄트(로스만)SS0.5","88019475":"B)켄트(로스만)SS화이트1","88021997":"B)켄트스위치1(신)","88021973":"B)켄트퍼플1(신)","88022628":"B)네오퍼플부스트(신)","88024349":"B)하이퍼용네오다크토바코","8888075099349":"B)하이퍼용네오보라보라클릭","88024332":"B)하이퍼용네오부스트","8888075101776":"B)하이퍼용네오블러쉬클릭","88024363":"B)하이퍼용네오샤인부스트","8888075099370":"B)하이퍼용네오썬키스클릭","8888075101806":"B)하이퍼용네오아일랜드클릭","88024356":"B)하이퍼용네오토바코스위치","88024325":"B)하이퍼용네오퍼플부스트","8888075081405":"B)하이퍼용네오프레스코","8809639421765":"비엔또)비스틱체인지(옐로우)","8809639421826":"비엔또)비스틱체인지(옐로우)리필전용","8809639421789":"비엔또)비스틱체인지(퍼플)","8809639421802":"비엔또)비스틱체인지(퍼플)리필전용"};
+const STORAGE='tobacco_mobile_inventory_v1';
+const TODAY=new Date().toISOString().slice(0,10);
+let records=loadRecords();
+let stream=null, track=null, detector=null, scanning=false, scanTimer=null, lastCode='', lastDetectedAt=0, lastFrameAt=0, currentBarcode='';
+const video=document.getElementById('video');
+const camMessage=document.getElementById('camMessage');
+const statusEl=document.getElementById('status');
+const startBtn=document.getElementById('startBtn');
+const torchBtn=document.getElementById('torchBtn');
+
+document.getElementById('dateBadge').textContent=TODAY;
+render();
+
+function setStatus(t){statusEl.textContent=t;}
+function cleanCode(v){return String(v||'').replace(/[^0-9A-Za-z]/g,'').trim();}
+function loadRecords(){try{const all=JSON.parse(localStorage.getItem(STORAGE)||'{}');return all[TODAY]||{};}catch(e){return {};}}
+function persist(){let all={};try{all=JSON.parse(localStorage.getItem(STORAGE)||'{}')}catch(e){} all[TODAY]=records;localStorage.setItem(STORAGE,JSON.stringify(all));}
+
+async function prepareDetector(){
+ if(!('BarcodeDetector' in window)) return false;
+ try{
+   const supported=await BarcodeDetector.getSupportedFormats();
+   const wanted=['ean_13','ean_8','code_128','upc_a','upc_e','code_39'];
+   const formats=wanted.filter(x=>supported.includes(x));
+   detector=new BarcodeDetector(formats.length?{formats}:undefined); return true;
+ }catch(e){return false;}
+}
+
+async function startCamera(){
+ if(scanning){await stopCamera();return;}
+ try{
+   if(!navigator.mediaDevices?.getUserMedia) throw new Error('브라우저에서 카메라 접근을 지원하지 않습니다.');
+   const nativeOk=await prepareDetector();
+   if(!nativeOk){
+     if(typeof Html5Qrcode==='undefined') throw new Error('바코드 인식 모듈을 불러오지 못했습니다.');
+     await startHtml5LiveFallback();
+     return;
+   }
+   stream=await navigator.mediaDevices.getUserMedia({
+     video:{facingMode:{ideal:'environment'},width:{ideal:640},height:{ideal:480}},
+     audio:false
+   });
+   video.srcObject=stream;
+   await video.play();
+   track=stream.getVideoTracks()[0];
+   scanning=true;
+   startBtn.textContent='자동 스캔 끄기';
+   camMessage.style.display='none';
+   const caps=track.getCapabilities?track.getCapabilities():{};
+   torchBtn.disabled=!caps.torch;
+   setStatus('자동 스캔 중 · 바코드를 초록 영역에 맞추세요');
+   nativeLoop();
+ }catch(e){
+   setStatus('자동 스캔 시작 실패: '+e.message);
+   camMessage.style.display='flex';
+   camMessage.textContent='카메라 권한을 허용한 뒤 다시 시작해주세요';
+ }
+}
+
+async function stopCamera(){
+ scanning=false;
+ if(scanTimer)cancelAnimationFrame(scanTimer);
+ scanTimer=null;
+ if(html5Live){
+   try{await html5Live.stop(); await html5Live.clear();}catch(e){}
+   html5Live=null;
+ }
+ const fb=document.getElementById('liveFallback');
+ if(fb)fb.style.display='none';
+ video.style.display='block';
+ if(stream)stream.getTracks().forEach(t=>t.stop());
+ stream=null; track=null; video.srcObject=null;
+ startBtn.textContent='자동 스캔 시작';
+ torchBtn.disabled=true;
+ camMessage.style.display='flex';
+ camMessage.textContent='자동 스캔 시작을 눌러주세요';
+ setStatus('자동 스캔 꺼짐');
+}
+
+async function nativeLoop(){
+ if(!scanning||!detector)return;
+ try{
+   const now=performance.now();
+   if(now-lastFrameAt>140 && video.readyState>=2){
+     lastFrameAt=now; const codes=await detector.detect(video); if(codes?.length) handleDetected(codes[0].rawValue);
+   }
+ }catch(e){}
+ scanTimer=requestAnimationFrame(nativeLoop);
+}
+
+let html5Live=null;
+async function startHtml5LiveFallback(){
+ try{
+   if(stream){stream.getTracks().forEach(t=>t.stop()); stream=null; track=null; video.srcObject=null;}
+   document.getElementById('liveFallback').style.display='block';
+   video.style.display='none';
+   html5Live=new Html5Qrcode('liveFallback');
+   await html5Live.start(
+     {facingMode:'environment'},
+     {fps:8, qrbox:{width:300,height:110}, aspectRatio:1.6,
+      formatsToSupport:[
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E
+      ]},
+     decodedText=>handleDetected(decodedText),
+     ()=>{}
+   );
+   scanning=true;
+   startBtn.textContent='자동 스캔 끄기';
+   camMessage.style.display='none';
+   setStatus('자동 스캔 중 · 바코드를 초록 영역에 맞추세요');
+ }catch(e){
+   setStatus('자동 스캔 시작 실패: '+e.message);
+   camMessage.style.display='flex';
+   camMessage.textContent='카메라 권한을 허용한 뒤 다시 시작해주세요';
+ }
+}
+
+async function toggleTorch(){
+ if(!track)return; try{const caps=track.getCapabilities(); if(!caps.torch)return; const s=track.getSettings(); await track.applyConstraints({advanced:[{torch:!s.torch}]});}catch(e){setStatus('손전등 제어를 지원하지 않습니다.');}
+}
+
+function beep(){
+ try{const C=window.AudioContext||window.webkitAudioContext;const c=new C(),o=c.createOscillator(),g=c.createGain();o.frequency.value=880;g.gain.value=.05;o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.08);}catch(e){}
+ if(navigator.vibrate)navigator.vibrate(70);
+}
+
+function handleDetected(raw){
+ const code=cleanCode(raw); if(!code)return; if(document.getElementById('modal').classList.contains('show'))return; const now=Date.now(); if(code===lastCode && now-lastDetectedAt<1800)return; lastCode=code; lastDetectedAt=now; beep(); openSheet(code);
+}
+
+function submitManual(){const el=document.getElementById('manualBarcode');const c=cleanCode(el.value);if(!c)return;openSheet(c);el.value='';}
+document.getElementById('manualBarcode').addEventListener('keydown',e=>{if(e.key==='Enter')submitManual();});
+
+function openSheet(code){
+ currentBarcode=code; const known=PRODUCTS[code]||''; const old=records[code]||null;
+ document.getElementById('sheetProduct').textContent=known||'미등록 바코드';
+ document.getElementById('sheetBarcode').textContent=code;
+ document.getElementById('unknownWrap').style.display=known?'none':'block';
+ document.getElementById('unknownName').value=old?.name&&!known?old.name:'';
+ document.getElementById('serverStock').value=old?.server??''; document.getElementById('actualStock').value=old?.actual??'';
+ calcDiff(); document.getElementById('modal').classList.add('show'); setTimeout(()=>document.getElementById('serverStock').focus(),150);
+}
+function closeSheet(){document.getElementById('modal').classList.remove('show');currentBarcode='';}
+function calcDiff(){const s=Number(document.getElementById('serverStock').value)||0,a=Number(document.getElementById('actualStock').value)||0,d=a-s;const el=document.getElementById('diffValue');el.textContent=(d>0?'+':'')+d;el.style.color=d<0?'#dc2626':d>0?'#2563eb':'#059669';}
+document.getElementById('serverStock').addEventListener('input',calcDiff);document.getElementById('actualStock').addEventListener('input',calcDiff);
+document.getElementById('serverStock').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('actualStock').focus();});
+document.getElementById('actualStock').addEventListener('keydown',e=>{if(e.key==='Enter')saveRecord();});
+
+function saveRecord(){
+ if(!currentBarcode)return; const known=PRODUCTS[currentBarcode]||''; const name=known||document.getElementById('unknownName').value.trim()||'미등록 상품';
+ const server=Number(document.getElementById('serverStock').value); const actual=Number(document.getElementById('actualStock').value);
+ if(!Number.isFinite(server)||!Number.isFinite(actual)){alert('서버재고와 실제재고를 입력해주세요.');return;}
+ records[currentBarcode]={barcode:currentBarcode,name,server,actual,diff:actual-server,updatedAt:new Date().toISOString()}; persist(); render(); closeSheet(); setStatus(name+' 저장 완료 · 다음 바코드를 스캔하세요');
+}
+
+function render(){
+ const arr=Object.values(records).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)); let neg=0,pos=0;arr.forEach(r=>{if(r.diff<0)neg+=-r.diff;else if(r.diff>0)pos+=r.diff;});
+ document.getElementById('statCount').textContent=arr.length;document.getElementById('statNeg').textContent=neg;document.getElementById('statPos').textContent=pos;
+ const el=document.getElementById('records'); if(!arr.length){el.innerHTML='<div class="empty">아직 조사한 상품이 없습니다.</div>';return;}
+ el.innerHTML=arr.map(r=>{const cls=r.diff<0?'diff-neg':r.diff>0?'diff-pos':'diff-zero',ds=(r.diff>0?'+':'')+r.diff;return `<div class="rec"><div><div class="rec-name">${esc(r.name)}</div><div class="rec-bc">${esc(r.barcode)}</div><div class="recnums">서버 ${r.server} · 실제 ${r.actual} · 차이 <span class="${cls}">${ds}</span></div></div><div><button class="smallbtn" onclick="openSheet('${r.barcode}')">수정</button> <button class="smallbtn" onclick="delRecord('${r.barcode}')">삭제</button></div></div>`}).join('');
+}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function delRecord(code){if(!confirm('이 항목을 삭제할까요?'))return;delete records[code];persist();render();}
+function clearAll(){if(!confirm('오늘 조사 기록을 전부 지울까요?'))return;records={};persist();render();}
+
+function exportCSV(){
+ const arr=Object.values(records); if(!arr.length){alert('저장할 기록이 없습니다.');return;}
+ const rows=[['조사일','바코드','상품명','서버재고','실제재고','차이']];arr.forEach(r=>rows.push([TODAY,r.barcode,r.name,r.server,r.actual,r.diff]));
+ const csv='\ufeff'+rows.map(row=>row.map(v=>'"'+String(v??'').replace(/\"/g,'\"\"')+'"').join(',')).join('\r\n');
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=`담배_재고조사_${TODAY}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),700);
+}
+
+// 사진 촬영 / 이미지 파일 바코드 인식
+
+window.addEventListener('beforeunload',()=>{if(stream)stream.getTracks().forEach(t=>t.stop());});
+</script>
+</body></html>
